@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -9,6 +10,7 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.API.Util;
+using Vintagestory.Common;
 
 namespace Dimensions.BlockEntityBehaviors;
 
@@ -34,7 +36,6 @@ public static class MultiblockStructureExtension {
 }
 
 public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
-  private bool _setPreview;
   private MultiblockStructure _multiblockStructure;
 
   // This is only set on the server side.
@@ -49,7 +50,6 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
 
   public override void Initialize(ICoreAPI api, JsonObject properties) {
     base.Initialize(api, properties);
-    _setPreview = properties["setPreview"].AsBool();
 
     // An instance of this BlockEntityBehavior is created every time a block
     // with this behavior is placed or loaded. If the same block type is placed
@@ -69,16 +69,7 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
     }
     if (Api is ICoreClientAPI capi) {
       if (_previewDimensionId > 0) {
-        // The minidimension origin isn't transferred from the server, or even
-        // saved to disk on the server. As part of loading and initializing the
-        // block on the client, set everything on the minidimension except the
-        // chunk contents.
-        IMiniDimension dim =
-            capi.World.GetOrCreateDimension(_previewDimensionId, Pos.ToVec3d());
-        dim.CurrentPos.SetFrom(Pos.ToVec3d());
-      }
-      if (_setPreview) {
-        capi.World.SetBlocksPreviewDimension(_previewDimensionId);
+        CreateDimensionClientSide(capi);
       }
     } else if (Api is ICoreServerAPI sapi) {
       if (_previewDimensionId != -1) {
@@ -105,11 +96,28 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
         // link them into the new MiniDimension object. So recreate them
         // instead. The new chunks will replace the old ones in the saved game
         // file.
-        FillMiniDimension();
-        sapi.Logger.Notification("Filled minidimension {0}",
-                                 _previewDimensionId);
+        // FillMiniDimension();
       }
     }
+  }
+
+  private void CreateDimensionClientSide(ICoreClientAPI capi) {
+    capi.World.SetBlocksPreviewDimension(_previewDimensionId);
+    // The minidimension origin isn't transferred from the server, or even
+    // saved to disk on the server. As part of loading and initializing the
+    // block on the client, set everything on the minidimension except the
+    // chunk contents.
+    //
+    // Instead of using `GetOrCreateDimension` to create a standard
+    // IMiniDimension, use AnchoredDimension so that the dimension can be
+    // transparent without following the cursor.
+    AnchoredDimension dim =
+        new((BlockAccessorBase)capi.World.BlockAccessor, Pos.ToVec3d());
+    dim.SetSubDimensionId(_previewDimensionId);
+    capi.World.Dimensions[_previewDimensionId] = dim;
+    dim.ClearChunks();
+    Api.Logger.Notification("Cleared existing chunks on minidimension {0}",
+                            _previewDimensionId);
   }
 
   public override void
@@ -120,17 +128,12 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
     _previewDimensionId = tree.GetAsInt("previewDimensionId");
     if (Api is ICoreClientAPI capi) {
       if (_previewDimensionId > 0) {
-        IMiniDimension dim =
-            capi.World.GetOrCreateDimension(_previewDimensionId, Pos.ToVec3d());
-        // `GetOrCreateDimension` only sets the dimension origin if it creates
-        // the dimension. The dimension may have been implicitly created
-        // beforehand if the chunks for the minidimension were transferred
-        // before this block update. So always update the current position in
-        // case the dimension already existed.
-        dim.CurrentPos.SetFrom(Pos.ToVec3d());
-      }
-      if (_setPreview) {
-        capi.World.SetBlocksPreviewDimension(_previewDimensionId);
+        CreateDimensionClientSide(capi);
+        capi.Network.SendBlockEntityPacket(Pos,
+                                           (int)PacketType.DimensionCreated);
+        capi.Logger.Notification(
+            "Sent DimensionCreated packet for dimension {0}",
+            _previewDimensionId);
       }
     }
   }
@@ -172,7 +175,7 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
           sapi.World.BlockAccessor.CreateMiniDimension(Pos.ToVec3d());
       sys.AllocateMiniDimension(sapi, _previewDimension);
       _previewDimensionId = _previewDimension.subDimensionId;
-      FillMiniDimension();
+      // FillMiniDimension();
     } else {
       sys.FreeMiniDimension(_previewDimension);
       _previewDimension = null;
@@ -199,6 +202,7 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
     // Adjust the X, Y, and Z coordinates to the center of the minidimension.
     _previewDimension.AdjustPosForSubDimension(minidimCenter);
     PlaceMismatchedBlocks(_previewDimension, minidimCenter);
+    Api.Logger.Notification("Filled minidimension {0}", _previewDimensionId);
   }
 
   private void PlaceMismatchedBlocks(IBlockAccessor placeAccessor,
@@ -238,5 +242,23 @@ public class SchematicPreview : BlockEntityBehavior, IBlockEntityForward {
       return;
     }
     placeAccessor.SetBlock(wantBlocks[0].Id, writePos);
+  }
+
+  public override void OnReceivedClientPacket(IPlayer fromPlayer, int packetid,
+                                              byte[] data) {
+    if (packetid == (int)PacketType.DimensionCreated) {
+      Api.Logger.Notification(
+          "Received DimensionCreated packet for dimension {0}",
+          _previewDimensionId);
+      if (_previewDimensionId != -1) {
+        FillMiniDimension();
+      }
+      return;
+    }
+    base.OnReceivedClientPacket(fromPlayer, packetid, data);
+  }
+
+  public enum PacketType {
+    DimensionCreated = 1000,
   }
 }
