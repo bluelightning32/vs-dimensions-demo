@@ -1,10 +1,8 @@
-using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
-using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 
 namespace Dimensions;
@@ -26,12 +24,13 @@ public class DimensionsSystem : ModSystem {
   public override void Start(ICoreAPI api) {
     _api = api;
     api.RegisterBlockBehaviorClass(nameof(BlockBehaviors.BlockEntityForward),
-                               typeof(BlockBehaviors.BlockEntityForward));
+                                   typeof(BlockBehaviors.BlockEntityForward));
     api.RegisterBlockEntityBehaviorClass(
-        nameof(BlockEntityBehaviors.SchematicPreview), typeof(BlockEntityBehaviors.SchematicPreview));
+        nameof(BlockEntityBehaviors.SchematicPreview),
+        typeof(BlockEntityBehaviors.SchematicPreview));
   }
 
-  public override void StartClientSide(ICoreClientAPI api) { }
+  public override void StartClientSide(ICoreClientAPI api) {}
 
   public override void StartServerSide(ICoreServerAPI api) {
     api.Event.SaveGameLoaded += OnSaveGameLoaded;
@@ -42,25 +41,29 @@ public class DimensionsSystem : ModSystem {
     if (_freeMiniDimensionIndexesDirty) {
       ((ICoreServerAPI)_api)
           .WorldManager.SaveGame.StoreData("dimensions.freeDimensions",
-                                           _freeMiniDimensionIndexes);
+                                           _freeMiniDimensionIndexes.ToList());
       _freeMiniDimensionIndexesDirty = false;
     }
   }
 
   private void OnSaveGameLoaded() {
-    _freeMiniDimensionIndexes = ((ICoreServerAPI)_api)
-                                    .WorldManager.SaveGame.GetData<Queue<int>>(
-                                        "dimensions.freeDimensions");
+    _freeMiniDimensionIndexes =
+        new(((ICoreServerAPI)_api)
+                .WorldManager.SaveGame.GetData<List<int>>(
+                    "dimensions.freeDimensions"));
+    _freeMiniDimensionIndexes ??= new();
     _freeMiniDimensionIndexesDirty = false;
   }
 
-  public IMiniDimension AllocateMiniDimension(ICoreServerAPI sapi, Vec3d pos) {
-    IMiniDimension blocks = sapi.World.BlockAccessor.CreateMiniDimension(pos);
+  public void AllocateMiniDimension(ICoreServerAPI sapi,
+                                    IMiniDimension blocks) {
     if (_freeMiniDimensionIndexes.TryDequeue(out int index)) {
       sapi.Server.SetMiniDimension(blocks, index);
       _freeMiniDimensionIndexesDirty = true;
+      sapi.Logger.Notification("Recycled subdimension id {0}", index);
     } else {
       index = sapi.Server.LoadMiniDimension(blocks);
+      sapi.Logger.Notification("Allocated new subdimension id {0}", index);
     }
     // The minidimension index is its index in the `LoadedMiniDimensions`
     // dictionary. Additionally minidimensions can be identified by their
@@ -72,7 +75,6 @@ public class DimensionsSystem : ModSystem {
     // Note that neither `LoadMiniDimension` nor `SetMiniDimension` set the
     // subdimension id.
     blocks.SetSubDimensionId(index);
-    return blocks;
   }
 
   public void FreeMiniDimension(IMiniDimension blocks) {
@@ -90,6 +92,8 @@ public class DimensionsSystem : ModSystem {
     blocks.UnloadUnusedServerChunks();
     _freeMiniDimensionIndexes.Enqueue(blocks.subDimensionId);
     _freeMiniDimensionIndexesDirty = true;
+    _api.Logger.Notification("Freed subdimension id {0}",
+                             blocks.subDimensionId);
   }
 
   public override void Dispose() { base.Dispose(); }

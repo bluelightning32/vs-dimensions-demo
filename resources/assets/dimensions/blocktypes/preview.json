@@ -1,0 +1,38 @@
+{
+  code: "preview",
+  behaviors: [
+    { name: "BlockEntityForward" }
+  ],
+  entityBehaviors: [
+    {
+      name: "SchematicPreview",
+      properties: {
+        // The following field was generated with the `/we gmc` command.
+        "multiblockStructure": {
+          blockNumbers: {
+            "stationarybasket-north": 1,
+            "woodenaxle-ns": 2,
+            "tallgrass-short-free": 3,
+            "plankstairs-birch-up-north-free": 4,
+            "termitemound-andesite-large": 5,
+          },
+          offsets: [
+            { x: 0, y: 0, z: 1, w: 1 },
+            { x: 0, y: 0, z: -1, w: 2 },
+            { x: 1, y: 0, z: 0, w: 1 },
+            { x: 1, y: 0, z: 1, w: 3 },
+            { x: -1, y: 0, z: 0, w: 4 },
+            { x: -1, y: 0, z: -1, w: 5 },
+            { x: 2, y: 0, z: 0, w: 3 },
+          ]
+        }
+      }
+    }
+  ],
+  drawtype: "cube",
+  creativeinventory: { "meta": ["*"] },
+  blockmaterial: "Meta",
+  textures: {
+    all: { base: "preview" }
+  },
+}
