@@ -11,14 +11,16 @@
         "multiblockStructure": {
           blockNumbers: {
             "stationarybasket-north": 1,
-            "woodenaxle-ns": 2,
+            "woodenaxle-we": 2,
             "tallgrass-short-free": 3,
             "plankstairs-birch-up-north-free": 4,
             "termitemound-andesite-large": 5,
+            "planks-birch-ud": 6,
           },
           offsets: [
             { x: 0, y: 0, z: 1, w: 1 },
             { x: 0, y: 0, z: -1, w: 2 },
+            { x: 0, y: 0, z: -2, w: 6 },
             { x: 1, y: 0, z: 0, w: 1 },
             { x: 1, y: 0, z: 1, w: 3 },
             { x: -1, y: 0, z: 0, w: 4 },
