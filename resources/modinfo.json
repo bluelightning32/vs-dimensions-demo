@@ -1,7 +1,7 @@
 {
 	"type": "code",
 	"name": "Dimensions Demo",
-	"modid": "lambda",
+	"modid": "dimensions",
 	"version": "1.0.0",
 	
 	"description" : "Demo for the Mini Dimensions functionality.",
