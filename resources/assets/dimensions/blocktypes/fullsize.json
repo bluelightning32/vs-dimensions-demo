@@ -1,0 +1,9 @@
+{
+  code: "fullsize",
+  drawtype: "json",
+  creativeinventory: { "meta": ["*"] },
+  blockmaterial: "Stone",
+  shape: {
+    base: "block/fullsize"
+  },
+}
