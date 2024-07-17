@@ -30,7 +30,7 @@ public class DimensionsSystem : ModSystem {
         typeof(BlockEntityBehaviors.SchematicPreview));
   }
 
-  public override void StartClientSide(ICoreClientAPI api) {}
+  public override void StartClientSide(ICoreClientAPI api) { }
 
   public override void StartServerSide(ICoreServerAPI api) {
     api.Event.SaveGameLoaded += OnSaveGameLoaded;
@@ -47,11 +47,15 @@ public class DimensionsSystem : ModSystem {
   }
 
   private void OnSaveGameLoaded() {
-    _freeMiniDimensionIndexes =
-        new(((ICoreServerAPI)_api)
+    List<int> freeMiniDimensionIndexesList =
+        ((ICoreServerAPI)_api)
                 .WorldManager.SaveGame.GetData<List<int>>(
-                    "dimensions.freeDimensions"));
-    _freeMiniDimensionIndexes ??= new();
+                    "dimensions.freeDimensions");
+    if (freeMiniDimensionIndexesList != null) {
+      _freeMiniDimensionIndexes = new(freeMiniDimensionIndexesList);
+    } else {
+      _freeMiniDimensionIndexes = new();
+    }
     _freeMiniDimensionIndexesDirty = false;
   }
 
